@@ -1,0 +1,432 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## On which weekday should we purchace VTI (Vanguard Total Stock Market ETF)?\n",
+    "\n",
+    "For each weekday defined by weekday 0 = Monday, ..., weekday 4 = Friday, compare the average prices of VTI and find out on which day we should purchase index funds if we want to avoid checking its price frequently or potentially for automation. "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Sampling:\n",
+    "1. Collect data of 30 weeks (30 Mondays, Tuesdays, Wednessday, Thursdays and Fridays) assuming that there is no bias and then apply test statistics to see what we get.  \n",
+    "\n",
+    "2. Based on the assumption that election results affect the stock market a lot, use data prior to the democrat's primary election and then apply test statistics to see what I get (~ Jan 31st, 2020).\n",
+    "\n",
+    "3. The news of coronavirus might have a huge effect on the stock prices as well so if that seems to be the case, I will think about a way to mitigate its effect: probably by using the data from last year (~ Nov 29th, 2019).\n",
+    "\n",
+    "**To make the sample unbiased, I will remove weeks that include holidays during the week, because, for example, if Monday is a holiday, then Tuesday might kind of function as Monday and this can be considered as a bias in the sample.**\n",
+    "\n",
+    "Since taking average is difficult given the availability of data, define average in two ways:\n",
+    "1. The (max + min) / 2\n",
+    "2. Closing value**"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 135,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# utility functions\n",
+    "\n",
+    "def days(year: int, month: int):\n",
+    "    days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]\n",
+    "\n",
+    "    if year % 4 == 0 and month == 2:\n",
+    "        return 29\n",
+    "    else:\n",
+    "        return days[month - 1]\n",
+    "\n",
+    "def eval_date(date: str):\n",
+    "    return list(map(int, date.split(\"-\")))\n",
+    "\n",
+    "def is_sequence(dates):\n",
+    "    n = dates[0][2]\n",
+    "    for i in range(4):\n",
+    "        c_date = dates[i]\n",
+    "        if c_date[2] != n:\n",
+    "            return False\n",
+    "        if c_date[2] == 1:\n",
+    "            month, year = 0, 0\n",
+    "            if c_date[1] != 1:\n",
+    "                month = c_date[1] - 1\n",
+    "                year = c_date[0]\n",
+    "            else:\n",
+    "                month = 12\n",
+    "                year = c_date[0] - 1\n",
+    "            n = days(year, month)\n",
+    "        else:\n",
+    "            n = c_date[2] - 1\n",
+    "            \n",
+    "    return dates[4][2] == n\n",
+    "\n",
+    "def collect_data(mem, vals):\n",
+    "    [f, h, w, t, m] = vals\n",
+    "    mem[0].append(m)\n",
+    "    mem[1].append(t)\n",
+    "    mem[2].append(w)\n",
+    "    mem[3].append(h)\n",
+    "    mem[4].append(f)\n",
+    "    return mem\n",
+    "\n",
+    "def avg_1(data):\n",
+    "    return list(map(lambda weekday : sum(map(lambda x : (x[2] + x[3]) / 2, weekday)) / len(weekday), data))\n",
+    "\n",
+    "def avg_2(data):\n",
+    "    return list(map(lambda weekday : sum(map(lambda x : x[4], weekday)) / len(weekday), data))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hypothesis 1:\n",
+    "Let u0 = Average price of VTI on Mondays, u1 = Average price of VTI on Tuesdays, …).\n",
+    "1. H0: u0 = u1 = u2 = u3 = u4\n",
+    "2. H1: u's are different"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Sample 1:\n",
+    "30 weeks (30 Mondays, Tuesdays, Wednessday, Thursdays and Fridays) until 3/6/2020"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 136,
+   "metadata": {
+    "scrolled": false
+   },
+   "outputs": [],
+   "source": [
+    "vtis = pd.read_csv('VTI.csv', usecols=['Date','Open','High','Low','Close'])\n",
+    "vtis['Date'] = vtis['Date'].apply(eval_date)\n",
+    "vtis = vtis.iloc[::-1]\n",
+    "\n",
+    "data = [[], [], [], [], []]\n",
+    "\n",
+    "# remove weeks with holidays\n",
+    "while len(data[0]) < 30:\n",
+    "    if is_sequence(list(vtis.head(5)['Date'])):\n",
+    "        data = collect_data(data, vtis.head(5).values)\n",
+    "        vtis = vtis[5:]\n",
+    "    else:\n",
+    "        vtis = vtis[1:]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 1. average = (max + min) / 2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 137,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[155.44950028333332,\n",
+       " 155.5116669166667,\n",
+       " 155.40433393333336,\n",
+       " 155.51316656666665,\n",
+       " 155.42449923333334]"
+      ]
+     },
+     "execution_count": 137,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_1(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2. average = closing values"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 138,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[155.58700050000002,\n",
+       " 155.30366670000004,\n",
+       " 155.5786672,\n",
+       " 155.58900086666668,\n",
+       " 155.53233336666668]"
+      ]
+     },
+     "execution_count": 138,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_2(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Sample 2:\n",
+    "30 weeks prior to the democrat's primary (~ Jan 31st, 2020)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 139,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "vtis = pd.read_csv('VTI.csv', usecols=['Date','Open','High','Low','Close'])\n",
+    "vtis['Date'] = vtis['Date'].apply(eval_date)\n",
+    "vtis = vtis.iloc[::-1]\n",
+    "\n",
+    "while list(vtis.head(1)['Date']) != [[2020, 1, 31]]:\n",
+    "    vtis = vtis[1:]\n",
+    "\n",
+    "data = [[], [], [], [], []]\n",
+    "\n",
+    "# remove weeks with holidays\n",
+    "while len(data[0]) < 30:\n",
+    "    if is_sequence(list(vtis.head(5)['Date'])):\n",
+    "        data = collect_data(data, vtis.head(5).values)\n",
+    "        vtis = vtis[5:]\n",
+    "    else:\n",
+    "        vtis = vtis[1:]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 1. average = (max + min) / 2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 141,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[153.08966698333333,\n",
+       " 153.18916681666667,\n",
+       " 153.07583403333334,\n",
+       " 153.43566689999997,\n",
+       " 153.82699938333332]"
+      ]
+     },
+     "execution_count": 141,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_1(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2. average = closing values"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 142,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[153.0713338,\n",
+       " 153.18899993333332,\n",
+       " 153.2286672,\n",
+       " 153.66666709999996,\n",
+       " 153.80766653333333]"
+      ]
+     },
+     "execution_count": 142,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_2(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Sample 3:\n",
+    "Before the outbreak of coronavirus (~ Nov 29th, 2019)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 145,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "vtis = pd.read_csv('VTI.csv', usecols=['Date','Open','High','Low','Close'])\n",
+    "vtis['Date'] = vtis['Date'].apply(eval_date)\n",
+    "vtis = vtis.iloc[::-1]\n",
+    "\n",
+    "while list(vtis.head(1)['Date']) != [[2019, 11, 29]]:\n",
+    "    vtis = vtis[1:]\n",
+    "\n",
+    "data = [[], [], [], [], []]\n",
+    "\n",
+    "# remove weeks with holidays\n",
+    "while len(data[0]) < 30:\n",
+    "    if is_sequence(list(vtis.head(5)['Date'])):\n",
+    "        data = collect_data(data, vtis.head(5).values)\n",
+    "        vtis = vtis[5:]\n",
+    "    else:\n",
+    "        vtis = vtis[1:]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 1. average = (max + min) / 2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 146,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[150.0583333166667,\n",
+       " 150.16183323333334,\n",
+       " 149.99883434999998,\n",
+       " 150.2390004166667,\n",
+       " 150.63216655000002]"
+      ]
+     },
+     "execution_count": 146,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_1(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2. average = closing values"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 147,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[150.08533376666665,\n",
+       " 150.17699993333335,\n",
+       " 150.14166766666665,\n",
+       " 150.4310001666667,\n",
+       " 150.72333326666666]"
+      ]
+     },
+     "execution_count": 147,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "avg_2(data)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Hypothesis 2\n",
+    "However, there might always huge narrative in our society that affect the stock market significantly, so maybe it is good to not remove those factors.\n",
+    "Indeed, this is yet another hypothesis to be tested by comparing the results I get by trying to eliminate a particular potential factor.\n",
+    "**if there is no significant difference between data collected by removing a factor A vs. the data collected by removing a factor B then we can conclude that on which day to buy VTI is not affected by a dominant narrative created by breaking news.**"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Motivation:\n",
+    "I read books called Sapiens: A Brief History of Humankind, Homo Deus: A Brief History of Tomorrow, and 21 Lessons for the 21st Century all written by the same author, Yuval Noah Harari. In these books, one of the arguments the author makes is that the stock market is the largest and the most complex algorithm humans have invented and I found this idea fascinating and wanted to play with the stock market's data. Also, for my personal finance, I would like to know when I should purchase index funds."
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
